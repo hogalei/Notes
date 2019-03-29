@@ -42,4 +42,4 @@
 
 总结：给对象动态添加属性
 方法一：this.obj = {e: 0};
-方法二：this.$set(this.obj,'e',0}
+方法二：this.$set(this.obj,'e',0} //深度赋值方法 important
