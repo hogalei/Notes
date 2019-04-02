@@ -1,6 +1,0 @@
-====================vue + element-ui 功能细节总结====================
-1.表格控件
-（1）复选框勾选渲染
-this.$refs.table.toggleRowSelection(row); 当前行
-或者
-this.$refs.table.toggleRowSelection(index,true); 具体某行
