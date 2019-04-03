@@ -1,0 +1,844 @@
+====================vue + element-ui 批量操作功能====================
+
+<template>
+  <div>
+    <div>
+      <el-button
+        :pageButton="pageButton"
+        v-for="item in pageButton"
+        :key="item.name"
+        type="primary"
+        :disabled="item.disabled"
+        @click="action(item.buttonAction)"
+      >{{item.buttonName}}</el-button>
+    </div>
+    <el-input v-model="searchMessage.inputSearch" :disabled="inputDisabled"></el-input>
+    <!-- 真实显示的div -->
+    <div>
+      <el-table
+        :data="dataTable.data"
+        border
+        stripe
+        @filter-change="filterChange"
+        @sort-change="sortChange"
+        highlight-current-row
+        tooltip-effect="light"
+        :row-style="tableRowClassName"
+        :cell-style="tableCellClassName"
+        :header-cell-style="headerRowClassName"
+        ref="table"
+        size="small"
+        style="width: 100%"
+        @select="checkboxSelect"
+        @select-all="checkboxAll"
+        @row-click="rowClick"
+        @row-dblclick="rowDbClick"
+      >
+        <el-table-column type="selection" :selectable="selectable"></el-table-column>
+        <el-table-column
+          class-name="tableColumn"
+          v-for="item in dataTable.columns"
+          :key="item.key"
+          :prop="item.key"
+          :label="item.title"
+          resizable
+          :sortable="item.sortable"
+          :fixed="item.fixed"
+          show-overflow-tooltip
+          :filters="item.filters"
+          :column-key="item.key"
+        >
+          <template slot-scope="scope">
+            <!-- 编辑时的控件渲染 -->
+            <div v-if="scope.row.isEdit">
+              <!-- 普通文本框 -->
+              <el-input v-if="item.type=='input'" v-model="scope.row[item.key]"></el-input>
+              <!-- 富文本输入框 -->
+              <el-input
+                v-if="item.type=='textarea'"
+                type="textarea"
+                :rows="1"
+                placeholder="请输入内容"
+                v-model="scope.row[item.key]"
+                resize="none"
+              ></el-input>
+              <!-- 单选框 -->
+              <el-radio-group v-if="item.type=='radio'" v-model="scope.row[item.key]">
+                <el-radio
+                  v-for="subitem in item.r_Options"
+                  :key="subitem.id"
+                  :label="subitem.id"
+                >{{subitem.value}}</el-radio>
+              </el-radio-group>
+              <!-- 下拉框 -->
+              <el-select v-if="item.type=='select'" v-model="scope.row[item.key]">
+                <el-option
+                  v-for="subitem in item.options"
+                  :key="subitem.id"
+                  :label="subitem.label"
+                  :value="subitem.id"
+                ></el-option>
+              </el-select>
+              <!-- 日期选择器 -->
+              <el-date-picker
+                v-if="item.type=='datepicker'"
+                v-model="scope.row[item.key]"
+                value-format="yyyy-MM-dd "
+                style="width:100%"
+              ></el-date-picker>
+              <!-- 禁止编辑的文本 如ID列-->
+              <span v-if="item.type=='span'">{{scope.row[item.key]}}</span>
+            </div>
+            <!-- 非编辑状态下的文本显示 -->
+            <span v-else>{{handleFilter(scope.row[item.key],item)}}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+    <!-- 导出用的div -->
+    <div style="display:none">
+      <el-table
+        id="table"
+        :data="dataTable.data"
+        border
+        stripe
+        @filter-change="filterChange"
+        @sort-change="sortChange"
+        highlight-current-row
+        tooltip-effect="light"
+        :row-style="tableRowClassName"
+        :cell-style="tableCellClassName"
+        :header-cell-style="headerRowClassName"
+        size="small"
+        style="width: 100%"
+        @select="checkboxSelect"
+        @select-all="checkboxAll"
+        @row-click="rowClick"
+        @row-dblclick="rowDbClick"
+      >
+        <el-table-column type="selection" :selectable="selectable"></el-table-column>
+        <el-table-column
+          class-name="tableColumn"
+          v-for="item in dataTable.columns"
+          :key="item.key"
+          :prop="item.key"
+          :label="item.title"
+          resizable
+          :sortable="item.sortable"
+          show-overflow-tooltip
+          :filters="item.filters"
+          :column-key="item.key"
+        >
+          <template slot-scope="scope">
+            <!-- 根据需要的控件类型进行渲染 -->
+            <div v-if="scope.row.isEdit">
+              <!-- 普通文本框 -->
+              <el-input v-if="item.type=='input'" v-model="scope.row[item.key]"></el-input>
+              <!-- 下拉框 -->
+              <el-select v-if="item.type=='select'" v-model="scope.row[item.key]">
+                <el-option
+                  v-for="subitem in item.options"
+                  :key="subitem.id"
+                  :label="subitem.label"
+                  :value="subitem.id"
+                ></el-option>
+              </el-select>
+              <!-- 单选框 -->
+              <el-radio-group v-if="item.type=='radio'" v-model="scope.row[item.key]">
+                <el-radio
+                  v-for="subitem in item.r_Options"
+                  :key="subitem.id"
+                  :label="subitem.id"
+                >{{subitem.value}}</el-radio>
+              </el-radio-group>
+              <!-- 富文本输入框 -->
+              <el-input
+                v-if="item.type=='textarea'"
+                type="textarea"
+                :rows="1"
+                placeholder="请输入内容"
+                v-model="scope.row[item.key]"
+                resize="none"
+              ></el-input>
+
+              <!-- 禁止编辑文本 -->
+              <span v-if="item.type=='span'">{{scope.row[item.key]}}</span>
+              <!-- 日期选择器 -->
+              <el-date-picker
+                v-if="item.type=='datepicker'"
+                v-model="scope.row[item.key]"
+                value-format="yyyy-MM-dd"
+                style="width:100%"
+              ></el-date-picker>
+            </div>
+
+            <span v-else>{{handleFilter(scope.row[item.key],item)}}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
+    <div class="block">
+      <el-pagination
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+        :current-page="currentPage1"
+        :page-sizes="dataTable.pageSizes"
+        :page-size="dataTable.pageSizes[0]"
+        layout="total, sizes, prev, pager, next, jumper"
+        :total="dataTable.pageTotal"
+        :disabled="pageDisabled"
+      ></el-pagination>
+    </div>
+  </div>
+</template>
+
+<script>
+import FileSaver from "file-saver";
+import XLSX from "xlsx";
+import $ from "jquery";
+export default {
+  data() {
+    return {
+      pageDisabled: false,
+      inputDisabled: false,
+      filterDisabled: false,
+      pageButton: [
+        { buttonName: "添加", buttonAction: "add", disabled: false },
+        { buttonName: "编辑", buttonAction: "edit", disabled: false },
+        { buttonName: "删除", buttonAction: "delete", disabled: false },
+        { buttonName: "保存", buttonAction: "save", disabled: false },
+        { buttonName: "取消", buttonAction: "cancel", disabled: false },
+        { buttonName: "导出当前页", buttonAction: "output", disabled: false }
+      ],
+      oldDataTable: [],
+      addAmount: 0,
+      userStatus: "", // 控制勾选禁止状态
+      selection: [], // 记录用户勾选选项
+      //searchMessage对象解析：inputSearch
+      searchMessage: {
+        inputSearch: "",
+        pageSize: "",
+        currentPage: "",
+        filtersObject: {},
+        sortValue: ""
+      },
+      currentPage1: 1,
+      dataTable: {
+        //添加时的默认值
+        defaultData: {
+          id: "",
+          name: 1,
+          amount1: 0,
+          amount2: 0,
+          amount3: 0,
+          class: "1班",
+          aaa: "12",
+          date: "2011-01-01",
+          sex: 0,
+          remark: "哈哈哈"
+        },
+        pageSizes: [5, 10, 15, 20],
+        pageTotal: 200,
+        data: [
+          {
+            id: "12987122",
+            name: 1,
+            amount1: "234",
+            amount2: "3.2",
+            amount3: 10,
+            class: "1班",
+            aaa: "12",
+            //mark: [{ id: "12987122", property: "name" }],
+            date: "2011-01-01",
+            sex: 0,
+            remark: "哈哈哈"
+          },
+          {
+            id: "12987123",
+            name: 1,
+            amount1: "165",
+            amount2: "4.43",
+            amount3: 12,
+            class: "2班",
+            aaa: "12",
+            date: "2011-01-01",
+            sex: 1,
+            remark: "呵呵呵"
+          },
+          {
+            id: "12987124",
+            name: 2,
+            amount1: "324",
+            amount2: "1.9",
+            amount3: 9,
+            class: "2班",
+            aaa: "12",
+            tag: "家",
+            date: "2011-01-01",
+            sex: 0,
+            remark: "啊啊啊"
+          },
+          {
+            id: "12987125",
+            name: 1,
+            amount1: "621",
+            amount2: "2.2",
+            amount3: 17,
+            class: "2班",
+            aaa: "12",
+            date: "2011-01-01",
+            sex: 0,
+            remark: "哇哇哇"
+          },
+          {
+            id: "12987126",
+            name: 1,
+            amount1: "539",
+            amount2: "4.1",
+            amount3: 15,
+            class: "2班",
+            aaa: "12",
+            date: "2011-01-01",
+            sex: 0,
+            remark: "嘻嘻嘻"
+          },
+          {
+            id: "合计",
+            name: "",
+            amount1: "1111111",
+            amount2: "2222222",
+            amount3: 3333333,
+            class: "",
+            aaa: "4444444"
+          }
+        ],
+        columns: [
+          //隐藏的ID列，后台不需要给此列数据
+          // {
+          //   title: "ID",
+          //   key: "id",
+          //   type: "span",
+          //   sortable: "custom",
+          //   fixed: true
+          // },
+          {
+            title: "用户",
+            key: "name",
+            id: 1,
+            type: "select",
+            sortable: "custom",
+            options: [
+              { id: 1, label: "王小虎" },
+              { id: 2, label: "王小红" },
+              { id: 3, label: "王小白" },
+              { id: 4, label: "王小蓝" }
+            ]
+          },
+          {
+            title: "数值 1（元）",
+            key: "amount1",
+            type: "input",
+            sortable: "custom"
+          },
+          {
+            title: "数值 3（元）",
+            key: "amount2",
+            type: "input",
+            sortable: "custom"
+          },
+          {
+            title: "数值 3（元）",
+            key: "amount3",
+            type: "input",
+            sortable: "custom"
+            // filters: [
+            //   { text: ">2000", value: ">2000" },
+            //   { text: ">5000", value: ">5000" }
+            // ]
+          },
+          { title: "班别", key: "class", type: "input", sortable: "custom" },
+          { title: "你好", key: "aaa", type: "input", sortable: "custom" },
+          {
+            title: "日期",
+            key: "date",
+            type: "datepicker",
+            sortable: "custom"
+          },
+          {
+            title: "性别",
+            key: "sex",
+            type: "radio",
+            r_Options: [{ id: 0, value: "男" }, { id: 1, value: "女" }]
+          },
+          {
+            title: "备注",
+            key: "remark",
+            type: "textarea"
+          }
+        ]
+      }
+    };
+  },
+  methods: {
+    //点击新增按钮
+    addTable() {
+      //清除用户曾经所有的勾选（预防）
+      this.$refs.table.selection.forEach((a, b) => {
+        this.dataTable.data.forEach((c, d) => {
+          if (a.id == c.id) {
+            //console.log(d);
+            this.$nextTick(function() {
+              this.$refs.table.toggleRowSelection(
+                this.dataTable.data[d + 1],
+                false
+              );
+            });
+          }
+        });
+      });
+      //给数组添加一条空数据，并放在数据最前面
+      var copyFrame = this.dataTable.data[0];
+      var rowNew = Object.assign({}, copyFrame);
+      for (var i in rowNew) {
+        if (typeof rowNew[i] == "string") {
+          rowNew[i] = "";
+        } else if (typeof rowNew[i] == "number") {
+          rowNew[i] = "";
+        }
+      }
+      //加入添加行
+      this.dataTable.data.unshift(rowNew);
+      //加入带有默认值的添加行
+      //this.dataTable.data.unshift(this.dataTable.defaultData);
+      //默认勾选当前行，修改当前行为可编辑状态，给当前行数据添加一个isEdit,isChecked属性，其他行不可勾选
+      for (let i = 0; i < this.addAmount + 1; i++) {
+        this.$nextTick(function() {
+          this.$refs.table.toggleRowSelection(this.dataTable.data[i], true);
+        });
+      }
+      this.dataTable.data[0].isEdit = true;
+      this.dataTable.data[0].isChecked = true;
+      //用户点击状态为add
+      this.userStatus = "add";
+      this.addAmount = this.addAmount + 1; //把添加的行数记录下来，控制禁用其他行，查看selectable
+    },
+    //点击编辑按钮
+    editTable: function() {
+      this.oldDataTable = JSON.parse(JSON.stringify(this.oldDataTable));
+      //设置用户为编辑状态
+      //没有勾选时显示弹框
+      if (this.$refs.table.selection.length == 0) {
+        this.$alert("至少编辑一条数据", "警告", {
+          confirmButtonText: "确定",
+          callback: action => {}
+        });
+      }
+      //勾选的框为可编辑状态及勾选状态
+      this.dataTable.data.forEach((a, b) => {
+        this.$refs.table.selection.forEach((c, d) => {
+          if (a.id == c.id) {
+            a.isEdit = true;
+            a.isChecked = true;
+            //console.log(a);
+          }
+        });
+      });
+    },
+    handleFilter(data, column) {
+      //下拉框原始渲染转换
+      if (column.type == "radio") {
+        var arr = column.r_Options.filter(value => {
+          return data == value.id;
+        });
+        if (arr.length > 0) {
+          return arr[0].value;
+        }
+        return data;
+      } else if (column.type == "select") {
+        var arr = column.options.filter((value, index) => {
+          return data == value.id;
+        });
+        if (arr.length > 0) {
+          return arr[0].label;
+        }
+        return data;
+      } else {
+        return data;
+      }
+    },
+    //搜索、排序、筛选、分页禁用/启用功能 status为启用/禁用状态
+    searchDisabled(status) {
+      //搜索禁用启用
+      this.inputDisabled = status;
+      //排序禁用启用
+      if (status == true) {
+        this.$nextTick(() => {
+          //this.filterDisabled = !this.filterDisabled;
+          $(".el-table__column-filter-trigger i").css({ visibility: "hidden" });
+        });
+        this.dataTable.columns.forEach((value, index) => {
+          value.sortable = !status;
+        });
+      } else {
+        this.dataTable.columns.forEach((value, index) => {
+          value.sortable = "custom";
+        });
+      }
+      //分页禁用启用
+      this.pageDisabled = status;
+    },
+    //用户提示框通用函数 params 具体参数如下
+    tips: function(params) {
+      // var params = {
+      //   title:"提示信息",
+      //   text:"是否取消添加所有的添加项",
+      //   successText:"操作成功",
+      //   successCallback:function(){},
+      //   errorText:'操作失败',
+      //   errorCallback:function(){}
+      // }
+      this.$confirm(params.text, params.title, {
+        confirmButtonText: "是",
+        cancelButtonText: "否",
+        type: "warning"
+      })
+        .then(() => {
+          this.$message({
+            type: "success",
+            message: params.successText
+          });
+          params.successCallback();
+        })
+        .catch(() => {
+          this.$message({
+            type: "info",
+            message: params.errorText
+          });
+          params.errorCallback();
+        });
+    },
+    //控制按钮是否可用通用函数 params ["edit","delete"] disabledStatus true/false
+    pageButtonDisabled: function(params, disabledStatus) {
+      params.forEach((a, b) => {
+        this.pageButton.forEach((c, d) => {
+          if (a == c.buttonAction) {
+            c.disabled = disabledStatus;
+          }
+        });
+      });
+    },
+    //按钮功能函数
+    action: function(e) {
+      if (e === "add") {
+        this.addTable();
+        this.pageButtonDisabled(["edit", "delete", "output"], true);
+        this.pageButtonDisabled(["save"], false);
+        this.searchDisabled(true);
+      } else if (e === "edit") {
+        this.editTable();
+        if (this.$refs.table.selection.length != 0) {
+          this.pageButtonDisabled(["add", "delete", "output"], true);
+          this.pageButtonDisabled(["save"], false);
+          this.searchDisabled(true);
+          this.userStatus = "edit";
+        }
+      } else if (e === "delete") {
+        this.deleteTable();
+      } else if (e === "save") {
+        this.saveTable();
+      } else if (e === "cancel") {
+        this.cancelTable();
+      } else if (e === "output") {
+        this.exportExcel();
+      }
+    },
+    checkboxAll: function(selection) {
+      if (this.userStatus == "add") {
+        //提示框
+        var params = {
+          title: "提示信息",
+          text: "是否取消所有的添加行",
+          successText: "操作成功",
+          successCallback: () => {
+            //console.log(this.addAmount)
+            //删除所有的添加项,排序筛选等功能恢复正常使用
+            this.dataTable.data.splice(0, this.addAmount);
+            this.userStatus = "";
+            this.addAmount = 0;
+            this.pageButtonDisabled(["edit", "delete", "output"], false);
+            this.pageButtonDisabled(["save"], true);
+            this.searchDisabled(false);
+          },
+          errorText: "已成功取消",
+          errorCallback: () => {
+            //全部勾选回来
+            for (var i = 0; i < this.addAmount; i++) {
+              this.$refs.table.toggleRowSelection(this.dataTable.data[i], true);
+            }
+          }
+        };
+        this.tips(params);
+      }
+      if (this.userStatus == "edit") {
+        //全选时应该全部变成可编辑的状态，先保存一下原数组
+        if (this.$refs.table.selection.length > 0) {
+          this.oldDataTable = JSON.parse(JSON.stringify(this.oldDataTable));
+          for (var i = 0; i < this.dataTable.data.length - 1; i++) {
+            this.dataTable.data[i].isEdit = true;
+            this.dataTable.data[i].isChecked = true;
+          }
+        } else {
+          //取消全选时
+          var params = {
+            title: "提示信息",
+            text: "是否取消所有的编辑行",
+            successText: "操作成功",
+            successCallback: () => {
+              //console.log(this.dataTable.data, this.oldDataTable);
+              this.dataTable.data = JSON.parse(
+                JSON.stringify(this.oldDataTable)
+              );
+              this.userStatus = "";
+              this.pageButtonDisabled(["add", "delete", "output"], false);
+              this.pageButtonDisabled(["save"], true);
+              this.searchDisabled(false);
+            },
+            errorText: "已成功取消",
+            errorCallback: () => {
+              //全部还原并勾选
+              //console.log(this.addAmount);
+              for (var i = 0; i < this.dataTable.data.length - 1; i++) {
+                this.$refs.table.toggleRowSelection(
+                  this.dataTable.data[i],
+                  true
+                );
+              }
+            }
+          };
+          this.tips(params);
+        }
+      }
+    },
+    cancelTable: function() {
+      window.location.reload();
+    },
+    rowClick: function(row, column, event) {},
+    rowDbClick: function(row, column, event) {},
+    deleteTable: function() {
+      //询问框
+      if (this.$refs.table.selection.length == 0) {
+        this.$alert("至少选择一条数据", "警告", {
+          confirmButtonText: "确定",
+          callback: action => {}
+        });
+      } else {
+        var params = {
+          title: "提示信息",
+          text: "是否删除所选行",
+          successText: "操作成功",
+          successCallback: () => {
+            //传输给后台
+            console.log(this.$refs.table.selection);
+          },
+          errorText: "已成功取消",
+          errorCallback: () => {}
+        };
+        this.tips(params);
+      }
+    },
+
+    selectable: function(row, index) {
+      //只是让用户不能点，底层点阻止不了
+      if (this.userStatus == "add") {
+        if (this.addAmount == 0) {
+          return index < this.dataTable.data.length - 1;
+        }
+        return index < this.addAmount;
+      }
+      return index < this.dataTable.data.length - 1;
+    },
+    saveTable: function() {
+      console.log(this.$refs.table.selection);
+    },
+    checkboxSelect: function(selection, row) {
+      if (this.userStatus == "add") {
+        row.isChecked = false;
+        this.dataTable.data.forEach((value, index) => {
+          if (value.isChecked == true || value.id) {
+          } else {
+            if (this.$refs.table.selection.length >= 0) {
+              this.dataTable.data.splice(index, 1);
+              this.addAmount = this.addAmount - 1;
+              //当添加的数量即this.addAmount为0时
+              //（1）所有前面的勾选取消禁用function:selectable
+              //（2）编辑按钮取消禁用状态
+              if (this.addAmount == 0) {
+                this.userStatus = "";
+                this.pageButtonDisabled(["edit", "delete", "output"], false);
+                this.pageButtonDisabled(["save"], true);
+                this.searchDisabled(false);
+              }
+            }
+          }
+        });
+      }
+      //编辑状态
+      if (this.userStatus == "edit") {
+        //console.log(row.isChecked,row.isEdit);
+        row.isChecked = !row.isChecked;
+        row.isEdit = !row.isEdit;
+        //切换编辑状态
+        if (row.isEdit == false) {
+          //取消勾选时，表格内容应切换成原数据
+          this.dataTable.data.forEach((value, index) => {
+            if (row.id == value.id) {
+              this.$set(this.dataTable.data, index, this.oldDataTable[index]);
+              this.dataTable.data[index].isEdit = false;
+              this.dataTable.data[index].isChecked = false;
+            }
+          });
+        } else {
+          //勾选时
+          this.oldDataTable = JSON.parse(JSON.stringify(this.oldDataTable));
+        }
+        //取消所有的勾选了，状态恢复到原始
+        if (this.$refs.table.selection.length == 0) {
+          this.userStatus = "";
+          this.pageButtonDisabled(["add", "delete", "output"], false);
+          this.pageButtonDisabled(["save"], true);
+          this.searchDisabled(false);
+        }
+      }
+    },
+
+    sortChange: function(sortValue) {
+      console.log(sortValue);
+      this.searchMessage.sortValue = sortValue;
+      console.log(this.searchMessage);
+    },
+    handleSizeChange(val) {
+      this.searchMessage.pageSize = val;
+      console.log(this.searchMessage);
+    },
+    handleCurrentChange(val) {
+      //val 当前页页码
+      this.searchMessage.currentPage = val;
+      console.log(this.searchMessage);
+    },
+    filterChange: function(filters) {
+      //console.log(filters);
+      //filters:包含所在列及所在列筛选条件
+      //var filtersString = JSON.stringify(filters);
+      //filtersString:截取的属性名
+      //filtersString = filtersString.split(':')[0].split('"')[1];
+      var filtersString = Object.keys(filters);
+      //把属性名和属性值放入filtersObject对象中
+      this.searchMessage.filtersObject[filtersString] = filters[filtersString];
+      console.log(this.searchMessage);
+    },
+    formatter(row, column) {
+      return row.address;
+    },
+    tableCellClassName({ row, column, rowIndex, columnIndex }) {
+      if (row.mark) {
+        //console.log(row);
+        var mark = row.mark;
+        var id = mark[0].id;
+        var property = mark[0].property;
+        if (row.id === id && column.property === property) {
+          return "background: red;";
+        }
+      }
+      return "";
+    },
+    tableRowClassName({ row, rowIndex }) {
+      // row 每一行数据数组 rowIndex 行索引
+      if (row.mark) {
+        var mark = row.mark;
+        var id = mark[0].id;
+        if (row.id === id) {
+          return "background: yellow;";
+        }
+      }
+      return "";
+    },
+    headerRowClassName({ row, rowIndex }) {
+      if (rowIndex === 0) {
+        return "background: blue;color:white";
+      }
+    },
+    handleDownload() {
+      require.ensure([], () => {
+        const { export_json_to_excel } = require("@/assets/Excel/Export2Excel");
+        //这个地址和页面的位置相关，这个地址是Export2Excel.js相对于页面的相对位置
+        // console.log(export_json_to_excel);
+        // return false;
+        const tHeader = this.cutValue(this.dataTable.columns, "title"); //这个是表头名称 可以是iveiw表格中表头属性的title的数组
+        const filterVal = this.cutValue(this.dataTable.columns, "key"); //与表格数据配合 可以是iview表格中的key的数组
+        const list = this.dataTable.outPutData; //表格数据，iview中表单数据也是这种格式！
+        const data = this.formatJson(filterVal, list);
+        console.log(data);
+        export_json_to_excel(tHeader, data, "我的表格"); //列表excel  这个是导出表单的名称
+      });
+    },
+    formatJson(filterVal, jsonData) {
+      return jsonData.map(v => filterVal.map(j => v[j]));
+    },
+    cutValue(target, name) {
+      let arr = [];
+      for (let i = 0; i < target.length; i++) {
+        arr.push(target[i][name]);
+      }
+      return arr;
+    },
+    exportExcel() {
+      /* generate workbook object from table */
+      this.dataTable.columns.forEach((value, index) => {
+        if (value.fixed == true) {
+          //value.fixed = false;
+        }
+      });
+      var wb = XLSX.utils.table_to_book(document.querySelector("#table"));
+      /* get binary string as output */
+      var wbout = XLSX.write(wb, {
+        bookType: "xlsx",
+        bookSST: true,
+        type: "array"
+      });
+      try {
+        FileSaver.saveAs(
+          new Blob([wbout], { type: "application/octet-stream" }),
+          "sheetjs.xlsx"
+        );
+      } catch (e) {
+        if (typeof console !== "undefined") console.log(e, wbout);
+      }
+      return wbout;
+    }
+  },
+  mounted() {
+    //存储原来的数据，用于取消编辑时能够恢复回来
+    this.oldDataTable = JSON.parse(JSON.stringify(this.dataTable.data));
+    this.oldColumns = JSON.parse(JSON.stringify(this.dataTable.columns));
+    //保存按钮禁用
+    this.pageButtonDisabled(["save"], true);
+  }
+};
+</script>
+
+<!-- Add "scoped" attribute to limit CSS to this component only -->
+<style>
+.tableColumn {
+  height: 51px;
+}
+.el-table .warning-row {
+  background: red;
+}
+.el-table .success-row {
+  background: blue;
+}
+.el-tooltip__popper {
+  width: 1200px;
+}
+</style>
